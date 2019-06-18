@@ -107,6 +107,8 @@ type pKey struct {
 	key *C.EVP_PKEY
 }
 
+func NewKey(k *C.EVP_PKEY) (*pKey) { return &pKey{key: k} }
+
 func (key *pKey) evpPKey() *C.EVP_PKEY { return key.key }
 
 func (key *pKey) KeyType() NID {

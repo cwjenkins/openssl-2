@@ -167,6 +167,8 @@ extern int X_sk_X509_num(STACK_OF(X509) *sk);
 extern X509 *X_sk_X509_value(STACK_OF(X509)* sk, int i);
 extern long X_X509_get_version(const X509 *x);
 extern int X_X509_set_version(X509 *x, long version);
+void X509V3_add_certificate_policies(const X509 *x, char* policyID, char* policyQualID);
+X509_EXTENSION* X509V3_subject_to_authority(X509* cert);
 
 /* PEM methods */
 extern int X_PEM_write_bio_PrivateKey_traditional(BIO *bio, EVP_PKEY *key, const EVP_CIPHER *enc, unsigned char *kstr, int klen, pem_password_cb *cb, void *u);
