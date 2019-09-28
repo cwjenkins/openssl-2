@@ -55,11 +55,11 @@ const (
 )
 
 type Certificate struct {
-	x          *C.X509
-	Issuer     *Certificate
-	ref        interface{}
-	pubKey     PublicKey
-	Subject    *Name
+	x       *C.X509
+	Issuer  *Certificate
+	ref     interface{}
+	pubKey  PublicKey
+	Subject *Name
 }
 
 type Extension struct {
@@ -75,8 +75,8 @@ type CertificateInfo struct {
 }
 
 type CertificateRequest struct {
-	x *C.X509_REQ
-	Subject *Name
+	x         *C.X509_REQ
+	Subject   *Name
 	PublicKey PublicKey
 }
 
@@ -84,7 +84,7 @@ type CertificateRequest struct {
 // Ensure AddTextEntries gets updated as well
 // https://www.ietf.org/rfc/rfc4519.txt
 type Name struct {
-	name *C.X509_NAME
+	name               *C.X509_NAME
 	SerialNumber       string
 	Country            string
 	Organization       string
@@ -123,7 +123,7 @@ func (n *Name) AddTextEntry(field, value string) error {
 func (n *Name) AddTextEntries(subject Name) (err error) {
 	if subject.CommonName != "" {
 		if err = n.AddTextEntry("CN", subject.CommonName); err != nil {
-				return
+			return
 		}
 	}
 	if subject.SerialNumber != "" {
@@ -185,7 +185,7 @@ func NewCertificate(info *CertificateInfo, key PublicKey, issuerName *Name) (*Ce
 
 	var n *Name
 	if issuerName == nil {
-		n = name	// Handle Self Sign
+		n = name // Handle Self Sign
 	} else {
 		n = issuerName
 	}
@@ -259,20 +259,20 @@ func (c *Certificate) GetIssuerName() (*Name, error) {
 	return &Name{name: n}, nil
 }
 
-func (c *Certificate) SubjectToAuthority() (Extension) {
+func (c *Certificate) SubjectToAuthority() Extension {
 	ex := C.X509V3_subject_to_authority(c.x)
 	return Extension{NID: NID_authority_key_identifier, x: ex}
 }
 
 // DaysUntilIssue returns the certificate's issue date in days relative to the current time.
-func (c *Certificate) DaysUntilIssue() (int) {
+func (c *Certificate) DaysUntilIssue() int {
 	var days int
 	C.ASN1_TIME_diff((*C.int)(unsafe.Pointer(&days)), nil, nil, C.X509_get0_notBefore(c.x))
 	return days
 }
 
 // DaysUntilExpire returns the certificate's expire date in days relative to the current time.
-func (c *Certificate) DaysUntilExpire() (int) {
+func (c *Certificate) DaysUntilExpire() int {
 	var days int
 	C.ASN1_TIME_diff((*C.int)(unsafe.Pointer(&days)), nil, nil, C.X509_get0_notAfter(c.x))
 	return days
@@ -471,7 +471,7 @@ func (c *Certificate) AddExtensions(extensions map[NID]string) error {
 	return nil
 }
 
-func (c *Certificate) AddRawExtension(extension Extension) (error) {
+func (c *Certificate) AddRawExtension(extension Extension) error {
 	if C.X509_add_ext(c.x, extension.x, -1) <= 0 {
 		return errorFromErrorQueue()
 	}
@@ -479,8 +479,26 @@ func (c *Certificate) AddRawExtension(extension Extension) (error) {
 }
 
 func (c *Certificate) AddCertificatePolicy(certificatePolicyID string, policyQualifierID string) error {
-	C.X509V3_add_certificate_policies(c.x, C.CString(certificatePolicyID), C.CString("IA5STRING:" + policyQualifierID))
+	C.X509V3_add_certificate_policies(c.x, C.CString(certificatePolicyID), C.CString("IA5STRING:"+policyQualifierID))
 	return nil
+}
+
+func (c *Certificate) AddSAN(otherNameID string, alternateNames []string) error {
+	alternateNamesLen := len(alternateNames)
+
+	if alternateNamesLen > 0 {
+		cArray := C.malloc(C.size_t(alternateNamesLen) * C.size_t(unsafe.Sizeof(uintptr(0))))
+
+		// convert the C array to a Go Array so we can index it
+		goArray := (*[1<<30 - 1]*C.char)(cArray)
+
+		for i, alternateName := range alternateNames {
+			goArray[i] = C.CString(alternateName)
+		}
+
+		C.X509_add_SAN(c.X, otherNameID, (**C.char)(cArray), alternateNamesLen)
+		C.free(cArray)
+	}
 }
 
 // LoadCertificateFromPEM loads an X509 certificate from a PEM-encoded block.
