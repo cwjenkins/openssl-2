@@ -1,12 +1,12 @@
 #include <openssl/x509v3.h>
 
 void X509V3_add_SAN(const X509* x509, char* objectID, char** alternateNames, int alternateNamesLen) {
-  GENERAL_NAMES *gens = null;
-  GENERAL_NAME  *gen  = null;
-  ASN1_OBJECT   *oid  = null;
+  GENERAL_NAMES *gens = NULL;
+  GENERAL_NAME  *gen  = NULL;
+  ASN1_OBJECT   *oid  = NULL;
   int i;
 
-  if alternateNamesLen {
+  if(alternateNamesLen) {
       gens = sk_GENERAL_NAME_new_null();
       oid  = OBJ_txt2obj(objectID, 1);
 
