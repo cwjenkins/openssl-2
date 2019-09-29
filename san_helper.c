@@ -8,7 +8,7 @@ void X509V3_add_SAN(X509* x509, char* objectID, char** alternateNames, int alter
   int i;
 
   if(alternateNamesLen) {
-      gens = sk_GENERAL_NAMES_new_null();
+      gens = sk_GENERAL_NAMEXS_new_null();
       oid  = OBJ_txt2obj(objectID, 1);
 
       for(i = 0; i < alternateNamesLen; i++) {
@@ -29,5 +29,5 @@ void X509V3_add_SAN(X509* x509, char* objectID, char** alternateNames, int alter
       X509_add1_ext_i2d(x509, NID_subject_alt_name, gens, 0, 0);
     }
 
-  sk_GENERAL_NAMES_pop_free(gens, GENERAL_NAMES_free);
+  GENERAL_NAMES_free(gens);
 }
