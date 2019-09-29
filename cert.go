@@ -496,9 +496,10 @@ func (c *Certificate) AddSAN(otherNameID string, alternateNames []string) error 
 			goArray[i] = C.CString(alternateName)
 		}
 
-		C.X509V3_add_SAN(c.X, otherNameID, (**C.char)(cArray), alternateNamesLen)
+		C.X509V3_add_SAN(c.x, C.CString(otherNameID), (**C.char)(cArray), alternateNamesLen)
 		C.free(cArray)
 	}
+	return nil
 }
 
 // LoadCertificateFromPEM loads an X509 certificate from a PEM-encoded block.
