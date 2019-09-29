@@ -8,7 +8,7 @@ void X509V3_add_SAN(X509* x509, char* objectID, char** alternateNames, int alter
   int i;
 
   if(alternateNamesLen) {
-      gens = sk_GENERAL_NAMEXS_new_null();
+      gens = sk_GENERAL_NAME_new_null();
       oid  = OBJ_txt2obj(objectID, 1);
 
       for(i = 0; i < alternateNamesLen; i++) {
