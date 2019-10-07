@@ -22,12 +22,18 @@ void X509V3_add_SAN(X509* x509, char* objectID, char** alternateNames, int alter
 	GENERAL_NAME_set0_othername(gen, oid, asn1Type);
 	sk_GENERAL_NAME_push(gens, gen);
 
-	ASN1_TYPE_free(asn1Type);
-	ASN1_PRINTABLESTRING_free(sudi);
+	if(asn1Type) {
+	  ASN1_TYPE_free(asn1Type);
+	}
+	if(sudi) {
+	  ASN1_PRINTABLESTRING_free(sudi);
+	}
       }
 
       X509_add1_ext_i2d(x509, NID_subject_alt_name, gens, 0, 0);
-    }
 
-  GENERAL_NAMES_free(gens);
+      if(gens) {
+	GENERAL_NAMES_free(gens);
+      }
+    }
 }

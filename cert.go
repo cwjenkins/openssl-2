@@ -496,8 +496,10 @@ func (c *Certificate) AddSAN(otherNameID string, alternateNames []string) error 
 			goArray[i] = C.CString(alternateName)
 		}
 
+		runtime.LockOSThread()
 		C.X509V3_add_SAN(c.x, C.CString(otherNameID), (**C.char)(cArray), C.int(alternateNamesLen))
 		C.free(cArray)
+		runtime.UnlockOSThread()
 	}
 	return nil
 }
