@@ -525,7 +525,7 @@ func LoadCertificateFromPEM(pem_block []byte) (*Certificate, error) {
 	return x, nil
 }
 
-// LoadCertificateFromPEM loads an X509 certificate from a PEM-encoded block.
+// LoadCertificateFromDER loads an X509 certificate from a PEM-encoded block.
 func LoadCertificateFromDER(der_block []byte) (*Certificate, error) {
 	if len(der_block) == 0 {
 		return nil, errors.New("empty der block")
@@ -544,7 +544,7 @@ func LoadCertificateFromDER(der_block []byte) (*Certificate, error) {
 	return x, nil
 }
 
-func Free(c *Certificate) {
+func (c *Certificate) Free() {
 	C.X509_free(c.x)
 }
 
@@ -571,10 +571,12 @@ func LoadCertificateRequestFromDER(der []byte) (*CertificateRequest, error) {
 		return nil, errors.New("failed to get public key")
 	}
 	x := &CertificateRequest{x: certReq, Subject: &Name{name: n}, PublicKey: NewKey(k)}
-	runtime.SetFinalizer(x, func(x *CertificateRequest) {
-		C.X509_REQ_free(x.x)
-	})
 	return x, nil
+}
+
+func (cr *CertificateRequest) Free() {
+	cr.PublicKey.Free()
+	C.X509_REQ_free(c.x)
 }
 
 // MarshalPEM converts the X509 certificate to PEM-encoded format
