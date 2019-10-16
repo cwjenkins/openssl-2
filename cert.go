@@ -19,7 +19,6 @@ import "C"
 
 import (
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"math/big"
 	"runtime"
