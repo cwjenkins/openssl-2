@@ -55,11 +55,11 @@ const (
 )
 
 type Certificate struct {
-	x          *C.X509
-	Issuer     *Certificate
-	ref        interface{}
-	pubKey     PublicKey
-	Subject    *Name
+	x       *C.X509
+	Issuer  *Certificate
+	ref     interface{}
+	pubKey  PublicKey
+	Subject *Name
 }
 
 type Extension struct {
@@ -75,8 +75,8 @@ type CertificateInfo struct {
 }
 
 type CertificateRequest struct {
-	x *C.X509_REQ
-	Subject *Name
+	x         *C.X509_REQ
+	Subject   *Name
 	PublicKey PublicKey
 }
 
@@ -84,7 +84,7 @@ type CertificateRequest struct {
 // Ensure AddTextEntries gets updated as well
 // https://www.ietf.org/rfc/rfc4519.txt
 type Name struct {
-	name *C.X509_NAME
+	name               *C.X509_NAME
 	SerialNumber       string
 	Country            string
 	Organization       string
@@ -123,7 +123,7 @@ func (n *Name) AddTextEntry(field, value string) error {
 func (n *Name) AddTextEntries(subject Name) (err error) {
 	if subject.CommonName != "" {
 		if err = n.AddTextEntry("CN", subject.CommonName); err != nil {
-				return
+			return
 		}
 	}
 	if subject.SerialNumber != "" {
@@ -165,10 +165,10 @@ func (n *Name) GetEntry(nid NID) (entry string, ok bool) {
 // NewCertificate generates a basic certificate based
 // on the provided CertificateInfo struct
 func NewCertificate(info *CertificateInfo, key PublicKey, issuerName *Name) (*Certificate, error) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
 	c := &Certificate{x: C.X509_new()}
-	runtime.SetFinalizer(c, func(c *Certificate) {
-		C.X509_free(c.x)
-	})
 
 	name, err := c.GetSubjectName()
 	if err != nil {
@@ -185,7 +185,7 @@ func NewCertificate(info *CertificateInfo, key PublicKey, issuerName *Name) (*Ce
 
 	var n *Name
 	if issuerName == nil {
-		n = name	// Handle Self Sign
+		n = name // Handle Self Sign
 	} else {
 		n = issuerName
 	}
@@ -259,20 +259,20 @@ func (c *Certificate) GetIssuerName() (*Name, error) {
 	return &Name{name: n}, nil
 }
 
-func (c *Certificate) SubjectToAuthority() (Extension) {
+func (c *Certificate) SubjectToAuthority() Extension {
 	ex := C.X509V3_subject_to_authority(c.x)
 	return Extension{NID: NID_authority_key_identifier, x: ex}
 }
 
 // DaysUntilIssue returns the certificate's issue date in days relative to the current time.
-func (c *Certificate) DaysUntilIssue() (int) {
+func (c *Certificate) DaysUntilIssue() int {
 	var days int
 	C.ASN1_TIME_diff((*C.int)(unsafe.Pointer(&days)), nil, nil, C.X509_get0_notBefore(c.x))
 	return days
 }
 
 // DaysUntilExpire returns the certificate's expire date in days relative to the current time.
-func (c *Certificate) DaysUntilExpire() (int) {
+func (c *Certificate) DaysUntilExpire() int {
 	var days int
 	C.ASN1_TIME_diff((*C.int)(unsafe.Pointer(&days)), nil, nil, C.X509_get0_notAfter(c.x))
 	return days
@@ -471,7 +471,7 @@ func (c *Certificate) AddExtensions(extensions map[NID]string) error {
 	return nil
 }
 
-func (c *Certificate) AddRawExtension(extension Extension) (error) {
+func (c *Certificate) AddRawExtension(extension Extension) error {
 	if C.X509_add_ext(c.x, extension.x, -1) <= 0 {
 		return errorFromErrorQueue()
 	}
@@ -479,7 +479,28 @@ func (c *Certificate) AddRawExtension(extension Extension) (error) {
 }
 
 func (c *Certificate) AddCertificatePolicy(certificatePolicyID string, policyQualifierID string) error {
-	C.X509V3_add_certificate_policies(c.x, C.CString(certificatePolicyID), C.CString("IA5STRING:" + policyQualifierID))
+	C.X509V3_add_certificate_policies(c.x, C.CString(certificatePolicyID), C.CString("IA5STRING:"+policyQualifierID))
+	return nil
+}
+
+func (c *Certificate) AddSAN(otherNameID string, alternateNames []string) error {
+	alternateNamesLen := len(alternateNames)
+
+	if alternateNamesLen > 0 {
+		runtime.LockOSThread()
+		cArray := C.malloc(C.size_t(alternateNamesLen) * C.size_t(unsafe.Sizeof(uintptr(0))))
+
+		// convert the C array to a Go Array so we can index it
+		goArray := (*[1<<30 - 1]*C.char)(cArray)
+
+		for i, alternateName := range alternateNames {
+			goArray[i] = C.CString(alternateName)
+		}
+
+		C.X509V3_add_SAN(c.x, C.CString(otherNameID), (**C.char)(cArray), C.int(alternateNamesLen))
+		C.free(cArray)
+		runtime.UnlockOSThread()
+	}
 	return nil
 }
 
@@ -490,6 +511,7 @@ func LoadCertificateFromPEM(pem_block []byte) (*Certificate, error) {
 	}
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
+
 	bio := C.BIO_new_mem_buf(unsafe.Pointer(&pem_block[0]),
 		C.int(len(pem_block)))
 	cert := C.PEM_read_bio_X509(bio, nil, nil, nil)
@@ -504,17 +526,21 @@ func LoadCertificateFromPEM(pem_block []byte) (*Certificate, error) {
 	return x, nil
 }
 
-// LoadCertificateFromPEM loads an X509 certificate from a PEM-encoded block.
+// LoadCertificateFromDER loads an X509 certificate from a PEM-encoded block.
 func LoadCertificateFromDER(der_block []byte) (*Certificate, error) {
 	if len(der_block) == 0 {
 		return nil, errors.New("empty der block")
 	}
+
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
+
 	bio := C.BIO_new_mem_buf(unsafe.Pointer(&der_block[0]),
 		C.int(len(der_block)))
+
 	cert := C.d2i_X509_bio(bio, nil)
-	C.BIO_free(bio)
+	defer C.BIO_free(bio)
+
 	if cert == nil {
 		return nil, errorFromErrorQueue()
 	}
@@ -523,7 +549,7 @@ func LoadCertificateFromDER(der_block []byte) (*Certificate, error) {
 	return x, nil
 }
 
-func Free(c *Certificate) {
+func (c *Certificate) Free() {
 	C.X509_free(c.x)
 }
 
@@ -534,10 +560,13 @@ func LoadCertificateRequestFromDER(der []byte) (*CertificateRequest, error) {
 	}
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
+
 	bio := C.BIO_new_mem_buf(unsafe.Pointer(&der[0]),
 		C.int(len(der)))
+
 	certReq := C.d2i_X509_REQ_bio(bio, nil)
-	C.BIO_free(bio)
+	defer C.BIO_free(bio)
+
 	if certReq == nil {
 		return nil, errorFromErrorQueue()
 	}
@@ -550,10 +579,12 @@ func LoadCertificateRequestFromDER(der []byte) (*CertificateRequest, error) {
 		return nil, errors.New("failed to get public key")
 	}
 	x := &CertificateRequest{x: certReq, Subject: &Name{name: n}, PublicKey: NewKey(k)}
-	runtime.SetFinalizer(x, func(x *CertificateRequest) {
-		C.X509_REQ_free(x.x)
-	})
 	return x, nil
+}
+
+func (cr *CertificateRequest) Free() {
+	cr.PublicKey.Free()
+	C.X509_REQ_free(cr.x)
 }
 
 // MarshalPEM converts the X509 certificate to PEM-encoded format

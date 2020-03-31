@@ -20,24 +20,9 @@ void X509V3_add_certificate_policies(const X509* x509, char* policyID, char* cps
   sk_POLICYINFO_push(cpols, cpol);
 
   X509_EXTENSION* ext = X509V3_EXT_i2d(NID_certificate_policies, 0, cpols);
-
   STACK_OF(X509_EXTENSION) *extensions = (STACK_OF(X509_EXTENSION)*)X509_get0_extensions(x509);
   X509v3_add_ext(&extensions, ext, -1);
 
-  ASN1_OBJECT_free(certificatePolicyID);
-  ASN1_OBJECT_free(policyQualifierInfoID);
-
-  ASN1_TYPE_free(cps);
-
   X509_EXTENSION_free(ext);
-
-  /*
-  if(qualifiers != NULL) {
-    sk_POLICYQUALINFO_pop_free(qualifiers, POLICYQUALINFO_free);
-  }
-  if(cpols != NULL) {
-    sk_POLICYINFO_pop_free(cpols, POLICYINFO_free);
-  }
-  POLICYINFO_free(cpol);
-  CERTIFICATEPOLICIES_free(cpols); */
+  sk_POLICYINFO_pop_free(cpols, POLICYINFO_free);
 }

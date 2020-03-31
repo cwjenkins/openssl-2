@@ -85,6 +85,8 @@ type PublicKey interface {
 	// `KeyType() == KeyTypeRSA2` would both have `BaseType() == KeyTypeRSA`.
 	BaseType() NID
 
+	Free()
+
 	evpPKey() *C.EVP_PKEY
 }
 
@@ -107,7 +109,9 @@ type pKey struct {
 	key *C.EVP_PKEY
 }
 
-func NewKey(k *C.EVP_PKEY) (*pKey) { return &pKey{key: k} }
+func (key *pKey) Free() { C.EVP_PKEY_free(key.key) }
+
+func NewKey(k *C.EVP_PKEY) *pKey { return &pKey{key: k} }
 
 func (key *pKey) evpPKey() *C.EVP_PKEY { return key.key }
 
@@ -120,6 +124,8 @@ func (key *pKey) BaseType() NID {
 }
 
 func (key *pKey) SignPKCS1v15(method Method, data []byte) ([]byte, error) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 
 	ctx := C.X_EVP_MD_CTX_new()
 	defer C.X_EVP_MD_CTX_free(ctx)
